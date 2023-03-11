@@ -51,11 +51,17 @@
 #define DB_HIGH 74  // Rot
 #define DB_MAX 88   // Alle rot
 #define USE_SERIAL 1
+#define BIG_MODE 1
+#define BIG_MODE_LEDS 20
 
 
 
 //Adafruit_NeoPixel strip = Adafruit_NeoPixel(N_LEDS, PIN, NEO_GRB + NEO_KHZ800); // LEDs aktivieren
-Adafruit_NeoPixel strip (N_LEDS, PIN, NEO_GRB + NEO_KHZ800);
+#if (BIG_MODE > 0)
+  Adafruit_NeoPixel strip (BIG_MODE_LEDS, PIN, NEO_GRB + NEO_KHZ400);
+#else
+  Adafruit_NeoPixel strip (N_LEDS, PIN, NEO_GRB + NEO_KHZ800);
+#endif
 
 //
 // Configuration
@@ -381,7 +387,6 @@ void setup() {
   
   #if(USE_SERIAL > 0)
     Serial.begin(112500);
-    
   #endif
   // These lines are specifically to support the Adafruit Trinket 5V 16 MHz.
   // Any other board, you can remove this part (but no harm leaving it):
@@ -391,9 +396,26 @@ void setup() {
   // END of Trinket-specific code.
 
   strip.begin(); //LEDs aktivieren
-  strip.rainbow(2000,1,255,128,true);
-  strip.show(); //LED pixel zuruecksetzen
-  delay(1000);
+  strip.clear();
+
+  #if (BIG_MODE > 0)
+    strip.setBrightness(255);
+    for(int i=0; i<20;i++){ //20 LEDs
+      strip.setPixelColor(i,strip.Color(0,90,120));
+      strip.show();
+      delay(50);
+    }
+    for(int i=19; i>=0;i--){ //20 LEDs
+      strip.setPixelColor(i,strip.Color(0,0,0));
+      strip.show();
+      delay(50);
+    }
+    strip.show();
+  #else
+    strip.rainbow(2000,1,255,128,true);
+    strip.show(); //LED pixel zuruecksetzen
+    delay(1000);
+  #endif
   
   #if (USE_DISPLAY > 0)
     display.init();
@@ -448,39 +470,53 @@ void setup() {
         Serial.printf("%.1f\n", Leq_dB);
       #endif
 
-       // LEDs ansteuern
-       strip.clear(); // Set all pixel colors to 'off'     
-       // Wenn Pegel groesser 85 ist, dann LED anschalten
-       if (Leq_dB >= DB_MIN){
+
+    #if (BIG_MODE > 0)
+      strip.clear();
+      int base=50;
+      int db=int(Leq_dB);
+      for(int i=0; i<20;i++){ //20 LEDs
+        if(db>=base+2*i){ //From 50+0 to 50+38
+          strip.setPixelColor(i,strip.Color(0,90,120));
+        }
+      }
+      
+      strip.show();
+    #else
+      // LEDs ansteuern
+      strip.clear(); // Set all pixel colors to 'off'     
+      // Wenn Pegel groesser 85 ist, dann LED anschalten
+      if (Leq_dB >= DB_MIN){
           #if(USE_SERIAL > 0)
           Serial.printf("\r\nDB_MIN reached");
           #endif
-         strip.setPixelColor(0,strip.Color(0,90,0));
-       } 
-       // Wenn Pegel groesser 100 ist, dann 2 LEDs anschalten
-       if (Leq_dB >= DB_LOW) {
+        strip.setPixelColor(0,strip.Color(0,90,0));
+      } 
+      // Wenn Pegel groesser 100 ist, dann 2 LEDs anschalten
+      if (Leq_dB >= DB_LOW) {
           #if(USE_SERIAL > 0)
           Serial.printf("\r\nDB_LOW reached");
           #endif
-         strip.setPixelColor(1,strip.Color(90,60,0));
-       }
-       // Wenn Pegel groesser 110 ist, dann 3 LEDs anschalten
-       if (Leq_dB > DB_HIGH) {
+        strip.setPixelColor(1,strip.Color(90,60,0));
+      }
+      // Wenn Pegel groesser 110 ist, dann 3 LEDs anschalten
+      if (Leq_dB > DB_HIGH) {
           #if(USE_SERIAL > 0)
           Serial.printf("\r\nDB_HIGH reached ");
           #endif
-         strip.setPixelColor(2,strip.Color(90,0,0));    
-       }
-       // Wenn Pegel groesser 110 ist, dann 3 LEDs anschalten
-       if (Leq_dB > DB_MAX) {
+        strip.setPixelColor(2,strip.Color(90,0,0));    
+      }
+      // Wenn Pegel groesser 110 ist, dann 3 LEDs anschalten
+      if (Leq_dB > DB_MAX) {
           #if(USE_SERIAL > 0)
           Serial.printf("\r\nDB_MAX reached ");
           #endif
-         strip.setPixelColor(0,strip.Color(90,0,0));    
-         strip.setPixelColor(1,strip.Color(90,0,0));    
-         strip.setPixelColor(2,strip.Color(90,0,0));    
-       }
+        strip.setPixelColor(0,strip.Color(90,0,0));    
+        strip.setPixelColor(1,strip.Color(90,0,0));    
+        strip.setPixelColor(2,strip.Color(90,0,0));    
+      }
       strip.show();
+    #endif
 
 
       // Debug only
