@@ -50,6 +50,7 @@
 #define DB_MID 71   //Gelb
 #define DB_HIGH 74  // Rot
 #define DB_MAX 88   // Alle rot
+#define USE_SERIAL 1
 
 
 
@@ -378,9 +379,10 @@ void setup() {
   // i.e. if you want to (slightly) reduce ESP32 power consumption 
   setCpuFrequencyMhz(80); // It should run as low as 80MHz
   
-  Serial.begin(112500);
-  delay(1000); // Safety
-
+  #if(USE_SERIAL > 0)
+    Serial.begin(112500);
+    
+  #endif
   // These lines are specifically to support the Adafruit Trinket 5V 16 MHz.
   // Any other board, you can remove this part (but no harm leaving it):
   #if defined(__AVR_ATtiny85__) && (F_CPU == 16000000)
@@ -389,7 +391,9 @@ void setup() {
   // END of Trinket-specific code.
 
   strip.begin(); //LEDs aktivieren
-  //strip.show(); //LED pixel zuruecksetzen
+  strip.rainbow(2000,1,255,128,true);
+  strip.show(); //LED pixel zuruecksetzen
+  delay(1000);
   
   #if (USE_DISPLAY > 0)
     display.init();
@@ -439,32 +443,42 @@ void setup() {
       Leq_sum_sqr = 0;
       Leq_samples = 0;
 
-      // Serial output, customize (or remove) as needed
-      Serial.printf("%.1f\n", Leq_dB);
+      #if(USE_SERIAL > 0)
+        // Serial output, customize (or remove) as needed
+        Serial.printf("%.1f\n", Leq_dB);
+      #endif
 
        // LEDs ansteuern
        strip.clear(); // Set all pixel colors to 'off'     
        // Wenn Pegel groesser 85 ist, dann LED anschalten
        if (Leq_dB >= DB_MIN){
-         Serial.printf("DB_MIN reached");
-         strip.setPixelColor(0,strip.Color(0,150,0));
+          #if(USE_SERIAL > 0)
+          Serial.printf("\r\nDB_MIN reached");
+          #endif
+         strip.setPixelColor(0,strip.Color(0,90,0));
        } 
        // Wenn Pegel groesser 100 ist, dann 2 LEDs anschalten
        if (Leq_dB >= DB_LOW) {
-         Serial.printf("DB_LOW reached");
-         strip.setPixelColor(1,strip.Color(150,90,0));
+          #if(USE_SERIAL > 0)
+          Serial.printf("\r\nDB_LOW reached");
+          #endif
+         strip.setPixelColor(1,strip.Color(90,60,0));
        }
        // Wenn Pegel groesser 110 ist, dann 3 LEDs anschalten
        if (Leq_dB > DB_HIGH) {
-         Serial.printf("DB_HIGH reached ");
-         strip.setPixelColor(2,strip.Color(150,0,0));    
+          #if(USE_SERIAL > 0)
+          Serial.printf("\r\nDB_HIGH reached ");
+          #endif
+         strip.setPixelColor(2,strip.Color(90,0,0));    
        }
        // Wenn Pegel groesser 110 ist, dann 3 LEDs anschalten
        if (Leq_dB > DB_MAX) {
-         Serial.printf("DB_MAX reached ");
-         strip.setPixelColor(0,strip.Color(150,0,0));    
-         strip.setPixelColor(1,strip.Color(150,0,0));    
-         strip.setPixelColor(2,strip.Color(150,0,0));    
+          #if(USE_SERIAL > 0)
+          Serial.printf("\r\nDB_MAX reached ");
+          #endif
+         strip.setPixelColor(0,strip.Color(90,0,0));    
+         strip.setPixelColor(1,strip.Color(90,0,0));    
+         strip.setPixelColor(2,strip.Color(90,0,0));    
        }
       strip.show();
 
