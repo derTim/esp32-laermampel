@@ -49,9 +49,11 @@
 #define EEPROM_MAGIC_NUMBER 42
 
 #define USE_SERIAL 1
-#define BIG_DISPLAY 0
+#define BIG_DISPLAY 1
 #define BIG_DISPLAY_LEDS 20
-#define BIG_DISPLAY_MODE_DEFAULT 0
+#define BIG_DISPLAY_MODE_DEFAULT 1 // 1=individual leds, 2=one color
+
+#define BRIGHTNESS_DEFAULT 200
 
 #define USE_BLE 1
 
@@ -77,6 +79,7 @@ uint32_t db_mid;
 uint32_t db_high;
 uint32_t db_max;
 uint32_t big_display_mode;
+uint32_t brightness;
 
 
 // BLE UUIDs
@@ -87,6 +90,7 @@ uint32_t big_display_mode;
 #define CHARACTERISTIC_UUID_DB_HIGH   "87aa5898-c046-11ed-afa1-0242ac120002"
 #define CHARACTERISTIC_UUID_DB_MAX    "87aa59d8-c046-11ed-afa1-0242ac120002"
 #define CHARACTERISTIC_UUID_MODE      "87aa5b0e-c046-11ed-afa1-0242ac120002"
+#define CHARACTERISTIC_UUID_BRIGHTNESS "87aa6b0e-c046-11ed-afa1-0242ac120002"
 
 
 //Adafruit_NeoPixel strip = Adafruit_NeoPixel(N_LEDS, PIN, NEO_GRB + NEO_KHZ800); // LEDs aktivieren
@@ -177,32 +181,57 @@ constexpr double MIC_REF_AMPL = pow(10, double(MIC_SENSITIVITY)/20) * ((1<<(MIC_
 
           uint32_t newValue = std::stoi(value);
           Serial.println(newValue);
-          if(uuid.c_str() == CHARACTERISTIC_UUID_DB_MIN){
+          if(uuid == CHARACTERISTIC_UUID_DB_MIN){
             db_min = newValue;
             preferences.putUInt("db_min", db_min);
+            Serial.println("db_min saved!");
           }
-          else if(uuid.c_str() == CHARACTERISTIC_UUID_DB_LOW){
+          else if(uuid == CHARACTERISTIC_UUID_DB_LOW){
             db_low = newValue;
             preferences.putUInt("db_low", db_low);
+            Serial.println("db_low saved!");
           }
-          else if(uuid.c_str() == CHARACTERISTIC_UUID_DB_MID){
+          else if(uuid == CHARACTERISTIC_UUID_DB_MID){
             db_mid = newValue;
             preferences.putUInt("db_mid", db_mid);
+            Serial.println("db_mid saved!");
           }
-          else if(uuid.c_str() == CHARACTERISTIC_UUID_DB_HIGH){
+          else if(uuid == CHARACTERISTIC_UUID_DB_HIGH){
             db_high = newValue;
             preferences.putUInt("db_high", db_high);
+            Serial.println("db_high saved!");
           }
-          else if(uuid.c_str() == CHARACTERISTIC_UUID_DB_MAX){
+          else if(uuid == CHARACTERISTIC_UUID_DB_MAX){
             db_max = newValue;
             preferences.putUInt("db_max", db_max);
+            Serial.println("db_max saved!");
           }
-          else if(uuid.c_str() == CHARACTERISTIC_UUID_MODE){
+          else if(uuid == CHARACTERISTIC_UUID_MODE){
             big_display_mode = newValue;
-            preferences.putUInt("big_display_mode", big_display_mode);
+            preferences.putUInt("display_mode", big_display_mode);
+            Serial.println("big_display_mode saved!");
+          }
+          else if(uuid == CHARACTERISTIC_UUID_BRIGHTNESS){
+            brightness = newValue;
+            preferences.putUInt("brightness", brightness);
+            strip.setBrightness(brightness);
+            Serial.println("brightness saved!");
           }
         }
       }
+  };
+
+  bool deviceConnected = false;
+  class BLE_Server_Callback: public BLEServerCallbacks {
+    void onConnect(BLEServer* pServer) {
+      deviceConnected = true;
+    };
+
+    void onDisconnect(BLEServer* pServer) {
+      deviceConnected = false;
+      pServer->getAdvertising()->start();
+    }
+
   };
 
 #endif
@@ -479,7 +508,8 @@ void setup() {
   db_mid = preferences.getUInt("db_mid", DB_MID_DEFAULT);
   db_high = preferences.getUInt("db_high", DB_HIGH_DEFAULT);
   db_max = preferences.getUInt("db_max", DB_MAX_DEFAULT);
-  big_display_mode = preferences.getUInt("big_display_mode", BIG_DISPLAY_MODE_DEFAULT);
+  big_display_mode = preferences.getUInt("display_mode", BIG_DISPLAY_MODE_DEFAULT);
+  brightness = preferences.getUInt("brightness", BRIGHTNESS_DEFAULT);
 
   #if(USE_BLE>0)
     //Setup BLE
@@ -489,6 +519,7 @@ void setup() {
     BLEDevice::init(bleName);
 
     BLEServer *pServer = BLEDevice::createServer();
+    pServer->setCallbacks(new BLE_Server_Callback());
 
     BLEService *pService = pServer->createService(SERVICE_UUID);
 
@@ -528,6 +559,12 @@ void setup() {
                                           BLECharacteristic::PROPERTY_WRITE
                                         );
                                         
+    BLECharacteristic *pCharacteristic_brightness = pService->createCharacteristic(
+                                          CHARACTERISTIC_UUID_BRIGHTNESS,
+                                          BLECharacteristic::PROPERTY_READ |
+                                          BLECharacteristic::PROPERTY_WRITE
+                                        );
+                                        
 
     pCharacteristic_db_min->setCallbacks(new BLE_Callbacks());
     pCharacteristic_db_low->setCallbacks(new BLE_Callbacks());
@@ -535,6 +572,7 @@ void setup() {
     pCharacteristic_db_mid->setCallbacks(new BLE_Callbacks());
     pCharacteristic_db_max->setCallbacks(new BLE_Callbacks());
     pCharacteristic_db_mode->setCallbacks(new BLE_Callbacks());
+    pCharacteristic_brightness->setCallbacks(new BLE_Callbacks());
 
     pCharacteristic_db_min->setValue(std::to_string(db_min));
     pCharacteristic_db_low->setValue(std::to_string(db_low));
@@ -542,6 +580,7 @@ void setup() {
     pCharacteristic_db_mid->setValue(std::to_string(db_mid));
     pCharacteristic_db_max->setValue(std::to_string(db_max));
     pCharacteristic_db_mode->setValue(std::to_string(big_display_mode));
+    pCharacteristic_brightness->setValue(std::to_string(brightness));
 
     pService->start();
 
@@ -569,8 +608,9 @@ void setup() {
   strip.begin(); //LEDs aktivieren
   strip.clear();
 
+  strip.setBrightness(brightness);
+
   #if (BIG_DISPLAY > 0)
-    strip.setBrightness(255);
     for(int i=0; i<20;i++){ //20 LEDs
       strip.setPixelColor(i,strip.Color(0,90,120));
       strip.show();
@@ -638,8 +678,13 @@ void setup() {
 
       #if(USE_SERIAL > 0)
         // Serial output, customize (or remove) as needed
-        Serial.printf("%.1f\n", Leq_dB);
+        Serial.printf("\nDB: %.1f | ", Leq_dB);
       #endif
+
+    #if(USE_SERIAL > 0)
+        Serial.printf("DISPLAY: %d, DISPLAY_MODE: %d, BRIGHTNESS: %d ", BIG_DISPLAY, big_display_mode, brightness);
+        Serial.printf("| DB MIN: %d, LOW: %d, HIGH: %d, MAX: %d ", db_min, db_low, db_high, db_max);
+    #endif
 
 
     #if (BIG_DISPLAY > 0)
@@ -650,6 +695,46 @@ void setup() {
         for(int i=0; i<20;i++){ //20 LEDs
           if(db>=base+2*i){ //From 50+0 to 50+38
             strip.setPixelColor(i,strip.Color(0,90,120));
+          }
+        }
+      }
+      else if(big_display_mode == 2) {
+        // LEDs ansteuern
+        strip.clear(); // Set all pixel colors to 'off'     
+        // Wenn Pegel groesser 85 ist, dann LED anschalten
+        if (Leq_dB >= db_min){
+            #if(USE_SERIAL > 0)
+            Serial.printf("\r\nDB_MIN (%d)reached", db_min);
+            #endif
+          for(int i=0; i<20;i++){ //20 LEDs
+            strip.setPixelColor(i,strip.Color(0,255,0));
+          }
+        } 
+        // Wenn Pegel groesser 100 ist, dann 2 LEDs anschalten
+        if (Leq_dB >= db_low) {
+            #if(USE_SERIAL > 0)
+            Serial.printf("\r\nDB_LOW (%d)reached", db_low);
+            #endif
+          for(int i=0; i<20;i++){ //20 LEDs
+            strip.setPixelColor(i,strip.Color(190,190,0));
+          }
+        }
+        // Wenn Pegel groesser 110 ist, dann 3 LEDs anschalten
+        if (Leq_dB > db_high) {
+            #if(USE_SERIAL > 0)
+            Serial.printf("\r\nDB_HIGH (%d)reached", db_high);
+            #endif
+          for(int i=0; i<20;i++){ //20 LEDs
+            strip.setPixelColor(i,strip.Color(255,160,0));
+          }
+        }
+        // Wenn Pegel groesser 110 ist, dann 3 LEDs anschalten
+        if (Leq_dB > db_max) {
+            #if(USE_SERIAL > 0)
+            Serial.printf("\r\nDB_MAX (%d)reached", db_max);
+            #endif
+          for(int i=0; i<20;i++){ //20 LEDs
+            strip.setPixelColor(i,strip.Color(255,0,0));
           }
         }
       }
