@@ -49,7 +49,7 @@
 #define EEPROM_MAGIC_NUMBER 42
 
 #define USE_SERIAL 1
-#define BIG_DISPLAY 1
+#define BIG_DISPLAY 0
 #define BIG_DISPLAY_LEDS 20
 #define BIG_DISPLAY_MODE_DEFAULT 1 // 1=individual leds, 2=one color
 
@@ -97,7 +97,7 @@ uint32_t brightness;
 #if (BIG_DISPLAY > 0)
   Adafruit_NeoPixel strip (BIG_DISPLAY_LEDS, PIN, NEO_GRB + NEO_KHZ400);
 #else
-  Adafruit_NeoPixel strip (N_LEDS, PIN, NEO_GRB + NEO_KHZ800);
+  Adafruit_NeoPixel strip (N_LEDS, PIN, NEO_GRB + NEO_KHZ400);
 #endif
 
 //
@@ -225,11 +225,33 @@ constexpr double MIC_REF_AMPL = pow(10, double(MIC_SENSITIVITY)/20) * ((1<<(MIC_
   class BLE_Server_Callback: public BLEServerCallbacks {
     void onConnect(BLEServer* pServer) {
       deviceConnected = true;
+      strip.rainbow(12000,1,255,255,true);
+      strip.show();
+      delay(100);
+      strip.clear();
+      strip.show();
+      delay(100);
+      strip.rainbow(12000,1,255,255,true);
+      strip.show();
+      delay(100);
+      strip.clear();
+      strip.show();
+      delay(100);
+      strip.rainbow(12000,1,255,255,true);
+      strip.show();
+      delay(100);
+      strip.clear();
+      strip.show();
     };
 
     void onDisconnect(BLEServer* pServer) {
       deviceConnected = false;
       pServer->getAdvertising()->start();
+      strip.rainbow(12000,1,255,255,true);
+      strip.show();
+      delay(100);
+      strip.clear();
+      strip.show();
     }
 
   };
